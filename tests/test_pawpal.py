@@ -151,6 +151,49 @@ def test_marking_daily_task_complete_creates_next_occurrence() -> None:
 	assert len(tasks) == 2
 
 
+def test_order_tasks_returns_chronological_order() -> None:
+	tasks = [
+		CareTask(
+			task_id="task-early",
+			owner_id="owner-001",
+			pet_id="pet-001",
+			title="Early Task",
+			duration_minutes=15,
+			priority="medium",
+			preferred_window_start=time(7, 0),
+			preferred_window_end=time(7, 30),
+			required_today=False,
+		),
+		CareTask(
+			task_id="task-late",
+			owner_id="owner-001",
+			pet_id="pet-001",
+			title="Late Task",
+			duration_minutes=15,
+			priority="high",
+			preferred_window_start=time(10, 0),
+			preferred_window_end=time(10, 30),
+			required_today=True,
+		),
+		CareTask(
+			task_id="task-mid",
+			owner_id="owner-001",
+			pet_id="pet-001",
+			title="Mid Task",
+			duration_minutes=15,
+			priority="low",
+			preferred_window_start=time(8, 30),
+			preferred_window_end=time(9, 0),
+			required_today=False,
+		),
+	]
+
+	scheduler = Scheduler()
+	ordered = scheduler.order_tasks(tasks)
+
+	assert [task.task_id for task in ordered] == ["task-early", "task-mid", "task-late"]
+
+
 def test_detect_conflicts_returns_warning_message() -> None:
 	dog = Pet(
 		pet_id="pet-001",
@@ -215,3 +258,63 @@ def test_detect_conflicts_returns_warning_message() -> None:
 
 	assert len(warnings) == 1
 	assert "overlaps" in warnings[0]
+
+
+def test_detect_conflicts_flags_duplicate_times() -> None:
+	dog = Pet(
+		pet_id="pet-001",
+		owner_id="owner-001",
+		name="Mochi",
+		species="dog",
+		notes="",
+	)
+	tasks = [
+		CareTask(
+			task_id="task-201",
+			owner_id="owner-001",
+			pet_id=dog.pet_id,
+			title="Breakfast",
+			duration_minutes=20,
+			priority="high",
+			preferred_window_start=time(8, 0),
+			preferred_window_end=time(8, 30),
+			required_today=True,
+		),
+		CareTask(
+			task_id="task-202",
+			owner_id="owner-001",
+			pet_id=dog.pet_id,
+			title="Medication",
+			duration_minutes=20,
+			priority="high",
+			preferred_window_start=time(8, 0),
+			preferred_window_end=time(8, 30),
+			required_today=True,
+		),
+	]
+
+	scheduled_tasks = [
+		ScheduledTask(
+			scheduled_task_id="plan-dup-1",
+			plan_id="plan-dup",
+			task_id="task-201",
+			pet_id=dog.pet_id,
+			start_time=time(8, 0),
+			end_time=time(8, 30),
+		),
+		ScheduledTask(
+			scheduled_task_id="plan-dup-2",
+			plan_id="plan-dup",
+			task_id="task-202",
+			pet_id=dog.pet_id,
+			start_time=time(8, 0),
+			end_time=time(8, 30),
+		),
+	]
+
+	scheduler = Scheduler()
+	warnings = scheduler.detect_conflicts(scheduled_tasks=scheduled_tasks, tasks=tasks, pets=[dog])
+
+	assert len(warnings) == 1
+	assert "08:00-08:30" in warnings[0]
+	assert "same pet" in warnings[0]
