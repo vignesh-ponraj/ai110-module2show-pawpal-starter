@@ -27,13 +27,13 @@
 
 **a. Constraints and priorities**
 
-- What constraints does your scheduler consider (for example: time, priority, preferences)?
-- How did you decide which constraints mattered most?
+- My scheduler considers several constraints: owner daily available minutes, whether a task is required_today, task priority (high/medium/low), and preferred start time for ordering. It also validates owner-pet-task relationships before generating a plan, and it detects overlapping scheduled tasks as warnings.
+- I prioritized constraints by practical impact on a real day plan. First, the schedule must fit within available time. Second, required tasks should be included before optional tasks. Third, higher-priority tasks should be favored over lower-priority tasks. Preferred time windows are used as an ordering signal so earlier tasks are placed first when possible.
 
 **b. Tradeoffs**
 
-- Describe one tradeoff your scheduler makes.
-- Why is that tradeoff reasonable for this scenario?
+- One key tradeoff is using a simple greedy strategy (required + priority + duration ordering) instead of a globally optimal scheduling algorithm. This means the plan may not always be mathematically optimal across all combinations of tasks.
+- This tradeoff is reasonable for this scenario because it keeps the logic easy to understand, test, and debug while still producing practical schedules quickly. For a course project and early product version, predictable behavior and maintainability are more valuable than optimization complexity.
 
 ---
 

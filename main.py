@@ -1,6 +1,6 @@
 from datetime import date, time
 
-from pawpal_system import CareTask, Owner, Pet, Scheduler
+from pawpal_system import CareTask, Owner, Pet, ScheduledTask, Scheduler
 
 
 def build_demo_data() -> tuple[Owner, list[Pet], list[CareTask]]:
@@ -24,17 +24,18 @@ def build_demo_data() -> tuple[Owner, list[Pet], list[CareTask]]:
 	owner.add_pet(dog)
 	owner.add_pet(cat)
 
+	# Intentionally out of chronological order to verify time-based sorting.
 	tasks = [
 		CareTask(
 			task_id="task-001",
 			owner_id=owner.owner_id,
 			pet_id=dog.pet_id,
-			title="Morning Walk",
-			duration_minutes=30,
-			priority="high",
-			preferred_window_start=time(7, 0),
-			preferred_window_end=time(9, 0),
-			required_today=True,
+			title="Evening Play Session",
+			duration_minutes=25,
+			priority="medium",
+			preferred_window_start=time(17, 0),
+			preferred_window_end=time(19, 0),
+			required_today=False,
 		),
 		CareTask(
 			task_id="task-002",
@@ -51,24 +52,48 @@ def build_demo_data() -> tuple[Owner, list[Pet], list[CareTask]]:
 			task_id="task-003",
 			owner_id=owner.owner_id,
 			pet_id=dog.pet_id,
-			title="Evening Play Session",
-			duration_minutes=25,
-			priority="medium",
-			preferred_window_start=time(17, 0),
-			preferred_window_end=time(19, 0),
-			required_today=False,
+			title="Morning Walk",
+			duration_minutes=30,
+			priority="high",
+			preferred_window_start=time(7, 0),
+			preferred_window_end=time(9, 0),
+			required_today=True,
+		),
+		CareTask(
+			task_id="task-004",
+			owner_id=owner.owner_id,
+			pet_id=cat.pet_id,
+			title="Morning Medication",
+			duration_minutes=10,
+			priority="high",
+			preferred_window_start=time(7, 0),
+			preferred_window_end=time(8, 0),
+			required_today=True,
 		),
 	]
 
 	dog.add_task(tasks[0])
 	cat.add_task(tasks[1])
 	dog.add_task(tasks[2])
+	cat.add_task(tasks[3])
 
 	return owner, [dog, cat], tasks
 
 
 def print_schedule(owner: Owner, pets: list[Pet], tasks: list[CareTask]) -> None:
 	scheduler = Scheduler()
+	ordered_tasks = scheduler.order_tasks(tasks)
+
+	print("\n=== Raw Task Order (Out of Order Input) ===")
+	for task in tasks:
+		start_label = task.preferred_window_start.strftime("%H:%M") if task.preferred_window_start else "None"
+		print(f"{task.task_id} | {task.title} | start={start_label}")
+
+	print("\n=== Sorted Task Order (order_tasks) ===")
+	for task in ordered_tasks:
+		start_label = task.preferred_window_start.strftime("%H:%M") if task.preferred_window_start else "None"
+		print(f"{task.task_id} | {task.title} | start={start_label}")
+
 	plan = scheduler.generate_plan(
 		owner=owner,
 		pets=pets,
@@ -104,9 +129,63 @@ def print_schedule(owner: Owner, pets: list[Pet], tasks: list[CareTask]) -> None
 			task = task_by_id[task_id]
 			print(f"- {task.title} ({task.duration_minutes} min)")
 
+	# Mark one task complete and showcase filtering.
+	task_by_id["task-002"].mark_complete()
+
+	completed_tasks = scheduler.filter_tasks(
+		tasks=tasks,
+		pets=pets,
+		status="completed",
+	)
+	luna_tasks = scheduler.filter_tasks(
+		tasks=tasks,
+		pets=pets,
+		pet_name="Luna",
+	)
+
+	print("\n=== Filtered: Completed Tasks ===")
+	for task in completed_tasks:
+		print(f"{task.task_id} | {task.title} | status={task.status}")
+
+	print("\n=== Filtered: Tasks for Luna ===")
+	for task in luna_tasks:
+		print(f"{task.task_id} | {task.title} | pet_id={task.pet_id}")
+
+	# Explicit overlap demo: two tasks intentionally set to the same time window.
+	overlap_schedule = [
+		ScheduledTask(
+			scheduled_task_id="overlap-1",
+			plan_id=plan.plan_id,
+			task_id="task-003",
+			pet_id=pet_by_id[task_by_id["task-003"].pet_id].pet_id,
+			start_time=time(7, 0),
+			end_time=time(7, 30),
+		),
+		ScheduledTask(
+			scheduled_task_id="overlap-2",
+			plan_id=plan.plan_id,
+			task_id="task-004",
+			pet_id=pet_by_id[task_by_id["task-004"].pet_id].pet_id,
+			start_time=time(7, 0),
+			end_time=time(7, 15),
+		),
+	]
+	conflict_warnings = scheduler.detect_conflicts(
+		scheduled_tasks=overlap_schedule,
+		tasks=tasks,
+		pets=pets,
+	)
+
+	print("\n=== Conflict Detection Warnings ===")
+	if not conflict_warnings:
+		print("No conflicts detected.")
+	else:
+		for warning in conflict_warnings:
+			print(f"- {warning}")
+
 	print("\n" + plan.get_summary())
 
 
 if __name__ == "__main__":
-	demo_owner, demo_pets, demo_tasks = build_demo_data()
-	print_schedule(demo_owner, demo_pets, demo_tasks)
+    demo_owner, demo_pets, demo_tasks = build_demo_data()
+    print_schedule(demo_owner, demo_pets, demo_tasks)

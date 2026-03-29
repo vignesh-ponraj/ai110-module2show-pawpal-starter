@@ -22,6 +22,15 @@ Your final app should:
 - Display the plan clearly (and ideally explain the reasoning)
 - Include tests for the most important scheduling behaviors
 
+## Smarter Scheduling
+
+PawPal+ now includes a smarter scheduling layer in the backend:
+
+- Time-aware ordering: tasks are sorted by preferred start time, then by required flag, priority, and duration.
+- Task filtering: tasks can be filtered by completion status and by pet name.
+- Recurring tasks: when a daily or weekly task is completed, the next occurrence is automatically created with the correct due date.
+- Lightweight conflict detection: overlapping scheduled tasks are detected and returned as warnings instead of crashing the app.
+
 ## Getting started
 
 ### Setup
