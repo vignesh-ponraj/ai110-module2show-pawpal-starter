@@ -4,13 +4,22 @@
 
 **a. Initial design**
 
-- Briefly describe your initial UML design.
-- What classes did you include, and what responsibilities did you assign to each?
+- My initial UML design focused on a small set of classes that map directly to the main user actions: managing pets, creating care tasks, and generating/viewing a daily plan. I aimed for a simple, modular structure with clear separation between data objects and planning logic.
+- The classes and responsibilities were:
+- Owner: stores owner information and available time, and manages the owner's pet list.
+- Pet: stores pet profile details (name, species, notes) and links each pet to its care tasks.
+- CareTask: represents individual care activities with key scheduling attributes (duration, priority, preferred time window, required status).
+- DailyPlan: represents one day's schedule, stores scheduled tasks plus unscheduled tasks, and provides summary/completion-related behaviors.
+- ScheduledTask: represents a CareTask placed at a specific time in the day and tracks task status (planned/completed/skipped).
+- Scheduler: acts as the service/engine class that selects tasks based on constraints, orders them, assigns times, and produces a DailyPlan.
 
 **b. Design changes**
 
-- Did your design change during implementation?
-- If yes, describe at least one change and why you made it.
+- Yes. During implementation, I simplified and tightened the model so it was easier to implement correctly and better aligned with persistence needs.
+- One major change was improving relationship clarity for storage and lookups. I added explicit IDs to connect records cleanly (for example, owner_id on CareTask and plan_id on ScheduledTask) so plans, tasks, and pets can be queried without relying only on nested in-memory objects.
+- I also changed completion tracking from task_id to scheduled_task_id in DailyPlan. This avoids ambiguity when working with scheduled items and gives each planned item a unique identity for updates.
+- Another change was replacing string-based time fields with typed time values. This reduces parsing errors and makes scheduling logic (ordering and overlap checks) more reliable.
+- Finally, I removed the stored total_minutes field from DailyPlan and moved toward calculating total minutes from scheduled tasks. This avoids data drift and keeps plan summaries consistent with the actual scheduled items.
 
 ---
 
