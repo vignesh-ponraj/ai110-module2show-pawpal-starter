@@ -31,6 +31,18 @@ PawPal+ now includes a smarter scheduling layer in the backend:
 - Recurring tasks: when a daily or weekly task is completed, the next occurrence is automatically created with the correct due date.
 - Lightweight conflict detection: overlapping scheduled tasks are detected and returned as warnings instead of crashing the app.
 
+## Features
+
+- Greedy schedule builder: selects tasks that fit within the owner's available minutes.
+- Priority-aware selection: required tasks are considered first, then high/medium/low priority, then shorter duration.
+- Time-aware sorting: tasks are ordered chronologically by preferred start time (`HH:MM` parsing supported), then by required flag, priority, and duration.
+- Sequential time assignment: selected tasks are placed into back-to-back scheduled blocks starting from a configured day-start time.
+- Ownership validation: scheduler verifies task and pet ownership consistency before building a plan.
+- Status and pet filtering: task lists can be filtered by completion status (`pending`, `completed`, `skipped`) and by pet name.
+- Recurrence engine: completing `daily` or `weekly` tasks automatically generates the next occurrence with `due_date + 1 day` or `+ 7 days`.
+- Conflict warnings (non-blocking): overlapping scheduled tasks are detected and returned as warnings instead of raising runtime errors.
+- Scheduled-task completion by ID: completion actions target `scheduled_task_id` to avoid ambiguity when similar tasks exist.
+
 ## Getting started
 
 ### Setup
@@ -71,3 +83,8 @@ What our tests currently cover:
 Confidence Level: 4/5 stars
 
 Reasoning: the current suite passes (7/7 tests) and covers core scheduling behavior, but reliability is not yet fully proven for all edge cases (for example, weekly recurrence boundaries, invalid input handling, and larger mixed-task scheduling scenarios).
+
+## Demo
+
+<a href="image.png" target="_blank"><img src='image.png' title='PawPal App' width='' alt='PawPal App' class='center-block' /></a>.
+

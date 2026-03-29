@@ -41,13 +41,13 @@
 
 **a. How you used AI**
 
-- How did you use AI tools during this project (for example: design brainstorming, debugging, refactoring)?
-- What kinds of prompts or questions were most helpful?
+- I used AI throughout the workflow: first for design brainstorming (class responsibilities and relationships), then for implementation support (dataclass stubs, scheduling logic, recurrence, and conflict detection), and finally for UI integration and test-writing. I also used AI for small refactors such as improving method signatures and keeping relationships consistent as the design evolved.
+- The most helpful prompts were specific and task-focused, such as asking for a class diagram from agreed requirements, requesting targeted code changes (for example, add filtering by status or pet name), and asking to verify behavior with tests. Prompts that included constraints (for example, keep it simple, do not crash on conflicts) produced the best results.
 
 **b. Judgment and verification**
 
-- Describe one moment where you did not accept an AI suggestion as-is.
-- How did you evaluate or verify what the AI suggested?
+- One important moment was deciding not to keep a more complex design that introduced extra abstraction early (for example, a separate constraint object and heavier planning structure). Instead, I simplified to a smaller class set that better matched the project scope.
+- I evaluated AI suggestions by checking whether they fit the assignment goals, whether the relationships stayed clear, and whether the behavior could be tested quickly. I verified changes by running the app and test suite after each meaningful update.
 
 ---
 
@@ -55,13 +55,13 @@
 
 **a. What you tested**
 
-- What behaviors did you test?
-- Why were these tests important?
+- I tested core scheduling and model behaviors: task completion status changes, adding tasks to a pet, filtering tasks by status and pet name, recurrence creation for daily tasks, and conflict detection warnings for overlapping time blocks.
+- These tests were important because they cover the highest-risk behavior in this project: state transitions, relationship consistency, and schedule quality signals. They also protect key user-facing features shown in the terminal and Streamlit UI.
 
 **b. Confidence**
 
-- How confident are you that your scheduler works correctly?
-- What edge cases would you test next if you had more time?
+- I am moderately high confidence (about 4/5) that the scheduler works correctly for the implemented scope. The current tests pass and cover the main workflows.
+- With more time, I would test additional edge cases: weekly recurrence boundaries, invalid or missing time windows, duplicate IDs, very small available-minute budgets, large mixed task sets, and scenarios with many overlapping tasks across multiple pets.
 
 ---
 
@@ -69,12 +69,12 @@
 
 **a. What went well**
 
-- What part of this project are you most satisfied with?
+- I am most satisfied with the end-to-end integration: backend classes, scheduling logic, tests, and Streamlit UI now work together. The project moved from a starter template to a working planning system with sorting, filtering, recurrence, and conflict warnings.
 
 **b. What you would improve**
 
-- If you had another iteration, what would you improve or redesign?
+- In a next iteration, I would improve the planner with stronger optimization (not just greedy selection), richer time-window constraints, and clearer distinction between task templates and generated occurrences. I would also expand the UI for editing/deleting tasks and viewing plan history.
 
 **c. Key takeaway**
 
-- What is one important thing you learned about designing systems or working with AI on this project?
+- A key takeaway is that starting simple and validating each step is more effective than over-designing early. AI is most valuable when used iteratively with clear constraints, while human judgment is essential for choosing the right level of complexity and verifying correctness.

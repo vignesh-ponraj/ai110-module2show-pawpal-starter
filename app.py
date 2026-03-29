@@ -1,5 +1,5 @@
 import streamlit as st
-from datetime import date, time
+from datetime import date, datetime, time, timedelta
 
 from pawpal_system import CareTask, Owner, Pet, Scheduler
 
@@ -66,9 +66,13 @@ if "task_counter" not in st.session_state:
 if "tasks" not in st.session_state:
     st.session_state.tasks = []
 
+if "current_plan" not in st.session_state:
+    st.session_state.current_plan = None
+
 owner = st.session_state.owner
 owner.name = owner_name
 owner.daily_available_minutes = int(available_minutes)
+scheduler = Scheduler()
 
 if st.button("Add or update pet"):
     existing_pet = next(
@@ -123,6 +127,11 @@ with col2:
 with col3:
     priority = st.selectbox("Priority", ["low", "medium", "high"], index=2)
 
+preferred_start = st.time_input("Preferred start time", value=time(7, 0), step=900)
+
+frequency = st.selectbox("Frequency", ["once", "daily", "weekly"], index=0)
+due_date_input = st.date_input("Due date", value=date.today())
+
 required_today = st.checkbox("Required today", value=True)
 
 if st.button("Add task"):
@@ -130,6 +139,9 @@ if st.button("Add task"):
         st.error("Add a pet before adding tasks.")
     else:
         selected_pet = next(pet for pet in owner.pets if pet.name == selected_pet_name)
+        preferred_end = (
+            datetime.combine(date.today(), preferred_start) + timedelta(minutes=int(duration))
+        ).time()
         task = CareTask(
             task_id=f"task-{st.session_state.task_counter:03d}",
             owner_id=owner.owner_id,
@@ -137,9 +149,11 @@ if st.button("Add task"):
             title=task_title,
             duration_minutes=int(duration),
             priority=priority,
-            preferred_window_start=None,
-            preferred_window_end=None,
+            preferred_window_start=preferred_start,
+            preferred_window_end=preferred_end,
             required_today=required_today,
+            frequency=frequency,
+            due_date=due_date_input if frequency in {"daily", "weekly"} else None,
         )
         selected_pet.add_task(task)
         st.session_state.tasks.append(task)
@@ -158,8 +172,61 @@ if st.session_state.tasks:
                 "duration_minutes": task.duration_minutes,
                 "priority": task.priority,
                 "required_today": task.required_today,
+                "preferred_start": task.preferred_window_start.strftime("%H:%M")
+                if task.preferred_window_start
+                else "",
             }
             for task in st.session_state.tasks
+        ]
+    )
+
+    st.markdown("### Sorted Tasks")
+    sorted_tasks = scheduler.order_tasks(st.session_state.tasks)
+    st.table(
+        [
+            {
+                "task_id": task.task_id,
+                "pet": pet_lookup[task.pet_id].name if task.pet_id in pet_lookup else "Unknown",
+                "title": task.title,
+                "preferred_start": task.preferred_window_start.strftime("%H:%M")
+                if task.preferred_window_start
+                else "",
+                "priority": task.priority,
+                "required_today": task.required_today,
+            }
+            for task in sorted_tasks
+        ]
+    )
+
+    st.markdown("### Filter Tasks")
+    filter_col1, filter_col2 = st.columns(2)
+    with filter_col1:
+        status_filter = st.selectbox(
+            "Filter by status",
+            ["all", "pending", "completed", "skipped"],
+            index=0,
+        )
+    with filter_col2:
+        pet_filter = st.selectbox("Filter by pet", ["all"] + pet_names, index=0)
+
+    filtered_tasks = scheduler.filter_tasks(
+        tasks=st.session_state.tasks,
+        pets=owner.pets,
+        status=None if status_filter == "all" else status_filter,
+        pet_name=None if pet_filter == "all" else pet_filter,
+    )
+    st.table(
+        [
+            {
+                "task_id": task.task_id,
+                "pet": pet_lookup[task.pet_id].name if task.pet_id in pet_lookup else "Unknown",
+                "title": task.title,
+                "status": task.status,
+                "priority": task.priority,
+                "frequency": task.frequency,
+                "due_date": task.due_date.isoformat() if task.due_date else "",
+            }
+            for task in filtered_tasks
         ]
     )
 else:
@@ -176,7 +243,6 @@ if st.button("Generate schedule"):
     elif not st.session_state.tasks:
         st.error("Please add at least one task first.")
     else:
-        scheduler = Scheduler()
         plan = scheduler.generate_plan(
             owner=owner,
             pets=owner.list_pets(),
@@ -184,33 +250,79 @@ if st.button("Generate schedule"):
             plan_date=date.today(),
             day_start=time(7, 0),
         )
-
-        task_lookup = {task.task_id: task for task in st.session_state.tasks}
-        pet_lookup = {pet.pet_id: pet for pet in owner.pets}
-
+        st.session_state.current_plan = plan
         st.success("Schedule generated.")
-        st.write(plan.get_summary())
 
-        if plan.scheduled_tasks:
-            st.markdown("### Today's Schedule")
-            st.table(
-                [
-                    {
-                        "start": item.start_time.strftime("%H:%M"),
-                        "end": item.end_time.strftime("%H:%M"),
-                        "pet": pet_lookup[item.pet_id].name if item.pet_id in pet_lookup else "Unknown",
-                        "task": task_lookup[item.task_id].title if item.task_id in task_lookup else item.task_id,
-                        "priority": task_lookup[item.task_id].priority if item.task_id in task_lookup else "n/a",
-                    }
-                    for item in plan.scheduled_tasks
-                ]
-            )
+if st.session_state.current_plan is not None:
+    plan = st.session_state.current_plan
+    task_lookup = {task.task_id: task for task in st.session_state.tasks}
+    pet_lookup = {pet.pet_id: pet for pet in owner.pets}
 
-        if plan.unscheduled_task_ids:
-            st.markdown("### Unscheduled Tasks")
-            st.write(
-                [
-                    task_lookup[task_id].title if task_id in task_lookup else task_id
-                    for task_id in plan.unscheduled_task_ids
-                ]
+    st.write(plan.get_summary())
+
+    if plan.conflict_warnings:
+        st.markdown("### Schedule Warnings")
+        for warning in plan.conflict_warnings:
+            st.warning(warning)
+    else:
+        st.success("No schedule conflicts detected.")
+
+    if plan.scheduled_tasks:
+        st.markdown("### Today's Schedule")
+        st.table(
+            [
+                {
+                    "scheduled_task_id": item.scheduled_task_id,
+                    "start": item.start_time.strftime("%H:%M"),
+                    "end": item.end_time.strftime("%H:%M"),
+                    "pet": pet_lookup[item.pet_id].name if item.pet_id in pet_lookup else "Unknown",
+                    "task": task_lookup[item.task_id].title if item.task_id in task_lookup else item.task_id,
+                    "priority": task_lookup[item.task_id].priority if item.task_id in task_lookup else "n/a",
+                    "status": item.status,
+                }
+                for item in plan.scheduled_tasks
+            ]
+        )
+
+        pending_items = [item for item in plan.scheduled_tasks if item.status == "pending"]
+        if pending_items:
+            pending_label_map = {
+                f"{item.scheduled_task_id} | "
+                f"{task_lookup[item.task_id].title if item.task_id in task_lookup else item.task_id}": item.scheduled_task_id
+                for item in pending_items
+            }
+            selected_label = st.selectbox(
+                "Mark a scheduled task complete",
+                options=list(pending_label_map.keys()),
             )
+            if st.button("Complete selected task"):
+                selected_scheduled_task_id = pending_label_map[selected_label]
+                next_task = scheduler.mark_task_complete(
+                    plan=plan,
+                    scheduled_task_id=selected_scheduled_task_id,
+                    tasks=st.session_state.tasks,
+                )
+                if next_task is not None:
+                    owner_pet = next(
+                        (pet for pet in owner.pets if pet.pet_id == next_task.pet_id),
+                        None,
+                    )
+                    if owner_pet and not any(t.task_id == next_task.task_id for t in owner_pet.tasks):
+                        owner_pet.add_task(next_task)
+                    st.success(
+                        f"Completed task and created next {next_task.frequency} occurrence due {next_task.due_date}."
+                    )
+                else:
+                    st.success("Scheduled task marked complete.")
+                st.rerun()
+        else:
+            st.info("All scheduled tasks are completed or skipped.")
+
+    if plan.unscheduled_task_ids:
+        st.markdown("### Unscheduled Tasks")
+        st.write(
+            [
+                task_lookup[task_id].title if task_id in task_lookup else task_id
+                for task_id in plan.unscheduled_task_ids
+            ]
+        )
