@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import List
 
 import numpy as np
@@ -37,9 +38,30 @@ class Index:
 	texts: np.ndarray
 
 
-def build_index(corpus_dir: str) -> Index:
-	"""Placeholder for Task 4."""
-	raise NotImplementedError()
+def build_index(corpus_dir: Path, index_path: Path) -> None:
+	corpus_dir = Path(corpus_dir)
+	index_path = Path(index_path)
+
+	md_files = sorted(corpus_dir.glob("*.md"))
+	if not md_files:
+		raise ValueError(f"no markdown files in {corpus_dir}")
+
+	filenames = [p.name for p in md_files]
+	texts = [p.read_text() for p in md_files]
+
+	model = _get_model()
+	embeddings = model.encode(texts, convert_to_numpy=True).astype(np.float32)
+	norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+	norms[norms == 0] = 1.0
+	embeddings = embeddings / norms
+
+	index_path.parent.mkdir(parents=True, exist_ok=True)
+	np.savez(
+		index_path,
+		embeddings=embeddings,
+		filenames=np.array(filenames),
+		texts=np.array(texts),
+	)
 
 
 def load_index(filepath: str) -> Index:
