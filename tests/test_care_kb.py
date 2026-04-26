@@ -178,3 +178,30 @@ def test_query_raises_on_empty_index(tmp_path: Path):
 	)
 	with pytest.raises(ValueError, match="knowledge base is empty"):
 		query(empty_index, "anything")
+
+
+def test_query_below_threshold_says_cant_answer(tiny_index: Index):
+	result = query(tiny_index, "explain quantum mechanics in detail", threshold=0.6)
+
+	assert result.confident is False
+	assert "can't answer" in result.answer.lower()
+
+
+def test_query_above_threshold_formats_answer_with_citation(tiny_index: Index):
+	result = query(tiny_index, "how long should I walk my dog?", threshold=0.0)
+
+	assert result.confident is True
+	assert "`walk.md`" in result.answer
+	assert "30 to 60 minutes" in result.answer
+
+
+def test_query_threshold_is_configurable(tiny_index: Index):
+	high_threshold = query(
+		tiny_index, "how long should I walk my dog?", threshold=0.99
+	)
+	low_threshold = query(
+		tiny_index, "how long should I walk my dog?", threshold=0.0
+	)
+
+	assert high_threshold.confident is False
+	assert low_threshold.confident is True
