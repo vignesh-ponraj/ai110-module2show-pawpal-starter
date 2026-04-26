@@ -115,3 +115,18 @@ def query(
 		)
 
 	return QueryResult(answer=answer, matches=matches, confident=confident)
+
+
+def _cli_build(corpus_dir: str = "data/care_tips", index_path: str = "rag/index.npz") -> None:
+	build_index(Path(corpus_dir), Path(index_path))
+	print(f"built index at {index_path}")
+
+
+if __name__ == "__main__":
+	import sys
+
+	if len(sys.argv) >= 2 and sys.argv[1] == "build":
+		_cli_build()
+	else:
+		print("usage: python -m rag.care_kb build", file=sys.stderr)
+		sys.exit(2)
