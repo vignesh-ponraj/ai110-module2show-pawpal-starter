@@ -1,0 +1,35 @@
+flowchart TD
+    subgraph Corpus["Knowledge Corpus (offline)"]
+        MD["data/care_tips/*.md<br/>~30 hand-written snippets"]
+    end
+
+    subgraph Indexer["Indexer (build-time)"]
+        E1["SentenceTransformer<br/>all-MiniLM-L6-v2"]
+        NORM["L2-normalize"]
+        NPZ["index.npz<br/>(embeddings, filenames, texts)"]
+        MD --> E1 --> NORM --> NPZ
+    end
+
+    subgraph Runtime["Runtime (per query)"]
+        UI["Streamlit 'Ask PawPal'<br/>text_input"]
+        Q["query() in rag/care_kb.py"]
+        E2["Embed question +<br/>normalize"]
+        SIM["Cosine similarity<br/>(matrix dot product)"]
+        TOPK["Top-3 + scores"]
+        GATE{"top-1 score<br/>>= 0.35?"}
+        ANS["Formatted answer<br/>+ citation"]
+        REJECT["I can't answer<br/>not in KB"]
+        UI --> Q --> E2 --> SIM
+        NPZ -.loaded once.-> SIM
+        SIM --> TOPK --> GATE
+        GATE -->|yes| ANS
+        GATE -->|no| REJECT
+    end
+
+    subgraph HumanCheck["Human-in-the-loop"]
+        DEMO["User reads answer +<br/>expander w/ top-3 scores"]
+        TESTS["pytest test_care_kb.py<br/>(known Q -> expected doc)"]
+        ANS --> DEMO
+        REJECT --> DEMO
+        TESTS -.validates.-> Q
+    end

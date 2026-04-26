@@ -153,6 +153,10 @@ No mocking. Matches the project's existing testing posture (real Pet/Owner/Sched
 
 ## System diagram
 
+The diagram source lives in its own file: [rag-system-diagram.mmd](rag-system-diagram.mmd). Treat it as the source of truth — when the architecture changes (components added, data flow rerouted, threshold logic moved), update the `.mmd` file in the same change.
+
+The snippet below is rendered inline for convenience but should be kept in sync with the `.mmd` file.
+
 ```mermaid
 flowchart TD
     subgraph Corpus["Knowledge Corpus (offline)"]
