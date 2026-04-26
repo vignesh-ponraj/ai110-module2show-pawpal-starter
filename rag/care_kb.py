@@ -76,6 +76,42 @@ def load_index(index_path: Path) -> Index:
 		)
 
 
-def query(index: Index, question: str) -> QueryResult:
-	"""Placeholder for Task 6."""
-	raise NotImplementedError()
+def query(
+	index: Index,
+	question: str,
+	top_k: int = 3,
+	threshold: float = 0.35,
+) -> QueryResult:
+	if index.embeddings.shape[0] == 0:
+		raise ValueError("knowledge base is empty")
+
+	model = _get_model()
+	q_vec = model.encode([question], convert_to_numpy=True).astype(np.float32)[0]
+	q_norm = np.linalg.norm(q_vec)
+	if q_norm > 0:
+		q_vec = q_vec / q_norm
+
+	scores = index.embeddings @ q_vec
+	k = min(top_k, scores.shape[0])
+	top_idx = np.argsort(-scores)[:k]
+
+	matches = [
+		Match(
+			filename=str(index.filenames[i]),
+			score=float(scores[i]),
+			text=str(index.texts[i]),
+		)
+		for i in top_idx
+	]
+
+	confident = matches[0].score >= threshold
+	if confident:
+		top = matches[0]
+		answer = f"Based on `{top.filename}`:\n\n{top.text.strip()}"
+	else:
+		answer = (
+			"I can't answer that — I don't have information on that topic "
+			"in my pet-care knowledge base."
+		)
+
+	return QueryResult(answer=answer, matches=matches, confident=confident)
