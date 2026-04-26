@@ -64,9 +64,16 @@ def build_index(corpus_dir: Path, index_path: Path) -> None:
 	)
 
 
-def load_index(filepath: str) -> Index:
-	"""Placeholder for Task 5."""
-	raise NotImplementedError()
+def load_index(index_path: Path) -> Index:
+	index_path = Path(index_path)
+	if not index_path.exists():
+		raise FileNotFoundError(f"index file not found: {index_path}")
+	with np.load(index_path, allow_pickle=False) as data:
+		return Index(
+			embeddings=data["embeddings"].copy(),
+			filenames=data["filenames"].copy(),
+			texts=data["texts"].copy(),
+		)
 
 
 def query(index: Index, question: str) -> QueryResult:

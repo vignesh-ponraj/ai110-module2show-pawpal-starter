@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from rag.care_kb import Index, Match, QueryResult, _get_model, build_index
+from rag.care_kb import Index, Match, QueryResult, _get_model, build_index, load_index
 
 
 def test_match_dataclass_holds_filename_score_text():
@@ -100,3 +100,20 @@ def test_build_index_raises_on_empty_corpus(tmp_path: Path):
 
 	with pytest.raises(ValueError, match="no markdown files"):
 		build_index(empty, index_path)
+
+
+def test_load_index_round_trip(tiny_corpus: Path, tmp_path: Path):
+	index_path = tmp_path / "index.npz"
+	build_index(tiny_corpus, index_path)
+
+	index = load_index(index_path)
+
+	assert index.embeddings.shape == (3, 384)
+	assert index.embeddings.dtype == np.float32
+	assert sorted(index.filenames.tolist()) == ["feed.md", "groom.md", "walk.md"]
+	assert len(index.texts) == 3
+
+
+def test_load_index_missing_file_raises(tmp_path: Path):
+	with pytest.raises(FileNotFoundError):
+		load_index(tmp_path / "does_not_exist.npz")
