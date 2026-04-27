@@ -1,80 +1,40 @@
-# PawPal+ Project Reflection
+# PawPal+ Reflection (Module 4)
 
-## 1. System Design
+This reflection covers the Module 4 increment that added a knowledge-base RAG ("Ask PawPal") to the existing PawPal+ scheduling app.
 
-**a. Initial design**
+## Limitations and biases
 
-- My initial UML design focused on a small set of classes that map directly to the main user actions: managing pets, creating care tasks, and generating/viewing a daily plan. I aimed for a simple, modular structure with clear separation between data objects and planning logic.
-- The classes and responsibilities were:
-- Owner: stores owner information and available time, and manages the owner's pet list.
-- Pet: stores pet profile details (name, species, notes) and links each pet to its care tasks.
-- CareTask: represents individual care activities with key scheduling attributes (duration, priority, preferred time window, required status).
-- DailyPlan: represents one day's schedule, stores scheduled tasks plus unscheduled tasks, and provides summary/completion-related behaviors.
-- ScheduledTask: represents a CareTask placed at a specific time in the day and tracks task status (planned/completed/skipped).
-- Scheduler: acts as the service/engine class that selects tasks based on constraints, orders them, assigns times, and produces a DailyPlan.
+- **The corpus is small and hand-written.** Twenty ~120-word snippets cannot cover the breadth of real pet-care questions. Anything outside the topics I picked (walking, feeding, grooming, dental, nails, enrichment, socialization, common meds, toxic foods, illness signs, senior care, vaccinations, spay/neuter, house training, litter box, exercise safety) is correctly refused — but a user might mistake a refusal for the system being broken.
+- **The corpus reflects my own biases as the author.** I drew from general pet-care knowledge in my own head, biased toward dogs and cats in temperate climates with average-income owners. Exotic pets, working dogs, very small or very large breeds with breed-specific conditions, and culturally specific care practices are underrepresented.
+- **`all-MiniLM-L6-v2` is an English-only model trained on general web text.** Non-English questions, technical veterinary jargon, and dialect/slang ("zoomies", "FLUTD") may retrieve poorly even when the corpus would have a relevant answer.
+- **The 0.35 confidence threshold is a single global number.** Some questions that score 0.34 are answerable from the corpus; some that score 0.36 are not. A more honest system would learn the threshold per-topic or expose calibrated probabilities.
+- **No fact-checking.** If a snippet I wrote contains an error (e.g., a wrong dosage), the system will confidently cite that error. The "citation" gives the appearance of authority without an authoritative source.
 
-**b. Design changes**
+## Could it be misused, and how would I prevent that?
 
-- Yes. During implementation, I simplified and tightened the model so it was easier to implement correctly and better aligned with persistence needs.
-- One major change was improving relationship clarity for storage and lookups. I added explicit IDs to connect records cleanly (for example, owner_id on CareTask and plan_id on ScheduledTask) so plans, tasks, and pets can be queried without relying only on nested in-memory objects.
-- I also changed completion tracking from task_id to scheduled_task_id in DailyPlan. This avoids ambiguity when working with scheduled items and gives each planned item a unique identity for updates.
-- Another change was replacing string-based time fields with typed time values. This reduces parsing errors and makes scheduling logic (ordering and overlap checks) more reliable.
-- Finally, I removed the stored total_minutes field from DailyPlan and moved toward calculating total minutes from scheduled tasks. This avoids data drift and keeps plan summaries consistent with the actual scheduled items.
+The realistic misuse path is **medical reliance**: a user could ask about medication dosages, toxic-food intake amounts, or illness symptoms and treat the cited snippet as veterinary advice. Even though the snippets are written conservatively (e.g., "call your vet" appears in `signs_of_illness.md`, `toxic_foods.md`, `common_meds.md`), the appearance of a confident, cited answer can shift behavior.
 
----
+Mitigations I would add if this were going beyond a class demo:
 
-## 2. Scheduling Logic and Tradeoffs
+1. A persistent **"This is not veterinary advice"** banner above the answer area (not just at the bottom or in fine print).
+2. **Topic-specific guardrails**: detect questions about dosing, ingestion amounts, or acute illness and force a "call your vet" preface even when the cosine score is high.
+3. **A more conservative threshold for medical-adjacent files** (`common_meds.md`, `toxic_foods.md`, `signs_of_illness.md`) — say 0.55 instead of 0.35 — so borderline matches in those areas refuse rather than answer.
+4. **Logging of refused queries** so I can see what users are actually asking that the system can't answer; some of those reveal real gaps to expand the corpus, others reveal misuse patterns to guard against.
 
-**a. Constraints and priorities**
+## What surprised me while testing
 
-- My scheduler considers several constraints: owner daily available minutes, whether a task is required_today, task priority (high/medium/low), and preferred start time for ordering. It also validates owner-pet-task relationships before generating a plan, and it detects overlapping scheduled tasks as warnings.
-- I prioritized constraints by practical impact on a real day plan. First, the schedule must fit within available time. Second, required tasks should be included before optional tasks. Third, higher-priority tasks should be favored over lower-priority tasks. Preferred time windows are used as an ordering signal so earlier tasks are placed first when possible.
+The most surprising finding was how *unreliable* a simple cosine threshold is at the boundary. I'd assumed unrelated questions like "what's the capital of France?" would score near 0 — they don't. They score around 0.3 against this corpus, just because *any* English question shares some surface vocabulary with *any* English document. My initial test threshold of 0.5 was being silently passed by off-topic questions, which would have looked fine in tests but produced garbage answers in a real demo. I had to switch to a more obviously off-topic question (*"explain quantum mechanics in detail"*) and raise the test threshold to 0.6 to actually verify the refusal path.
 
-**b. Tradeoffs**
+The lesson was: **confidence scores from sentence embeddings are not probabilities**, and a fixed threshold without visible surfacing is a false sense of security. That's why the final UI shows the top-3 retrieved snippets with their cosine scores on every query — it makes the model's confidence (or lack of it) legible to a human in real time, rather than hiding it behind a gate.
 
-- One key tradeoff is using a simple greedy strategy (required + priority + duration ordering) instead of a globally optimal scheduling algorithm. This means the plan may not always be mathematically optimal across all combinations of tasks.
-- This tradeoff is reasonable for this scenario because it keeps the logic easy to understand, test, and debug while still producing practical schedules quickly. For a course project and early product version, predictable behavior and maintainability are more valuable than optimization complexity.
+## AI collaboration on this project
 
----
+I worked through this project iteratively with an AI assistant, using it for design brainstorming, code generation, test writing, and code review. The collaboration was structured: a brainstorming pass to lock in requirements, a written design spec, an implementation plan broken into ten small tasks, and a TDD workflow with separate spec-compliance and code-quality reviews after each task.
 
-## 3. AI Collaboration
+**One helpful AI suggestion.** When I described the RAG feature, my first instinct was to use a small local LLM (e.g., Ollama llama3.2:3b) for answer synthesis. The AI suggested I consider a non-LLM "extractive" path instead — return the top-1 retrieved snippet verbatim with a citation, no synthesis. The trade-off it surfaced was sharp: an LLM gives more conversational answers, but adds a 2GB runtime dependency, slower responses, and the possibility of hallucinated content drifting from the cited source. For a class demo on a 20-document corpus, deterministic citation with zero hallucination was the right call. I would not have made that choice on my own — I would have over-built. The AI's framing of the trade-off let me make a smaller, better system.
 
-**a. How you used AI**
+**One flawed AI suggestion.** During implementation, the AI initially produced a `query` test that asked *"what is the capital of France?"* with `threshold=0.5` and asserted the system would refuse. On my corpus, this question scored *above* 0.5 because the embedding model finds incidental surface similarity between any English question and any English document. The test passed locally for the AI in its head-model but would have failed in CI — and worse, it gave the false impression that a 0.5 threshold was sufficient to block off-topic questions. The bug surfaced when the test was actually run against the real model. The fix was a more clearly off-topic question and a higher test threshold, plus a permanent UI feature (the top-3 score table) so the same kind of false confidence couldn't hide in production. The lesson: AI-suggested tests can confidently assert behavior that doesn't survive real execution; running the test, not just reading it, is non-optional.
 
-- I used AI throughout the workflow: first for design brainstorming (class responsibilities and relationships), then for implementation support (dataclass stubs, scheduling logic, recurrence, and conflict detection), and finally for UI integration and test-writing. I also used AI for small refactors such as improving method signatures and keeping relationships consistent as the design evolved.
-- The most helpful prompts were specific and task-focused, such as asking for a class diagram from agreed requirements, requesting targeted code changes (for example, add filtering by status or pet name), and asking to verify behavior with tests. Prompts that included constraints (for example, keep it simple, do not crash on conflicts) produced the best results.
+## Key takeaway
 
-**b. Judgment and verification**
-
-- One important moment was deciding not to keep a more complex design that introduced extra abstraction early (for example, a separate constraint object and heavier planning structure). Instead, I simplified to a smaller class set that better matched the project scope.
-- I evaluated AI suggestions by checking whether they fit the assignment goals, whether the relationships stayed clear, and whether the behavior could be tested quickly. I verified changes by running the app and test suite after each meaningful update.
-
----
-
-## 4. Testing and Verification
-
-**a. What you tested**
-
-- I tested core scheduling and model behaviors: task completion status changes, adding tasks to a pet, filtering tasks by status and pet name, recurrence creation for daily tasks, and conflict detection warnings for overlapping time blocks.
-- These tests were important because they cover the highest-risk behavior in this project: state transitions, relationship consistency, and schedule quality signals. They also protect key user-facing features shown in the terminal and Streamlit UI.
-
-**b. Confidence**
-
-- I am moderately high confidence (about 4/5) that the scheduler works correctly for the implemented scope. The current tests pass and cover the main workflows.
-- With more time, I would test additional edge cases: weekly recurrence boundaries, invalid or missing time windows, duplicate IDs, very small available-minute budgets, large mixed task sets, and scenarios with many overlapping tasks across multiple pets.
-
----
-
-## 5. Reflection
-
-**a. What went well**
-
-- I am most satisfied with the end-to-end integration: backend classes, scheduling logic, tests, and Streamlit UI now work together. The project moved from a starter template to a working planning system with sorting, filtering, recurrence, and conflict warnings.
-
-**b. What you would improve**
-
-- In a next iteration, I would improve the planner with stronger optimization (not just greedy selection), richer time-window constraints, and clearer distinction between task templates and generated occurrences. I would also expand the UI for editing/deleting tasks and viewing plan history.
-
-**c. Key takeaway**
-
-- A key takeaway is that starting simple and validating each step is more effective than over-designing early. AI is most valuable when used iteratively with clear constraints, while human judgment is essential for choosing the right level of complexity and verifying correctness.
+For grounded AI features on small, well-defined domains, the most valuable design decisions are about **what *not* to do**: don't add an LLM if retrieval alone answers the question, don't hide confidence behind a single number, don't trust thresholds without seeing them in action, and don't let a "citation" stand in for an authoritative source. The visible-score expander in the UI and the "I can't answer" output are not features I added — they're features I refused to omit, and they are what make the system trustworthy enough to demo.

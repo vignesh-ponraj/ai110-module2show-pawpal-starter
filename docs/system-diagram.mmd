@@ -1,0 +1,53 @@
+flowchart TD
+    subgraph User["Human / User"]
+        OWNER["Pet owner<br/>(types in Streamlit UI)"]
+    end
+
+    subgraph App["app.py — Streamlit UI"]
+        SCHED_UI["Scheduling section<br/>(owner, pet, tasks)"]
+        RAG_UI["Ask PawPal section<br/>(free-text question)"]
+    end
+
+    subgraph Scheduler["Scheduling subsystem (pawpal_system.py)"]
+        TASKS["CareTask / Pet / Owner<br/>data model"]
+        ORDER["Scheduler.order_tasks<br/>(priority + time-aware)"]
+        PLAN["Scheduler.generate_plan<br/>(greedy fit + conflict detection)"]
+        DAILY["DailyPlan<br/>(scheduled tasks + warnings)"]
+        TASKS --> ORDER --> PLAN --> DAILY
+    end
+
+    subgraph RAG["Knowledge-base RAG subsystem (rag/care_kb.py)"]
+        CORPUS["data/care_tips/*.md<br/>20 hand-written snippets"]
+        BUILD["build_index<br/>(SentenceTransformer +<br/>L2-normalize)"]
+        NPZ["rag/index.npz<br/>(embeddings + texts)"]
+        QUERY["query<br/>(cosine top-k)"]
+        GATE{"top-1 score<br/>>= 0.35 ?"}
+        ANSWER["Cited answer<br/>(filename + snippet)"]
+        REJECT["I can't answer<br/>(not in KB)"]
+        CORPUS --> BUILD --> NPZ
+        NPZ -.loaded once.-> QUERY
+        QUERY --> GATE
+        GATE -->|yes| ANSWER
+        GATE -->|no| REJECT
+    end
+
+    subgraph Verify["Reliability checks"]
+        TESTS["pytest suite<br/>29 tests<br/>(7 scheduling + 22 RAG)"]
+        SCORES["Top-3 retrieval table<br/>w/ cosine scores<br/>(visible in UI)"]
+        ERRORS["Error handling<br/>empty corpus / missing index /<br/>empty question"]
+    end
+
+    OWNER --> SCHED_UI
+    OWNER --> RAG_UI
+
+    SCHED_UI --> TASKS
+    DAILY --> SCHED_UI
+
+    RAG_UI --> QUERY
+    ANSWER --> RAG_UI
+    REJECT --> RAG_UI
+
+    TESTS -.validates.-> Scheduler
+    TESTS -.validates.-> RAG
+    SCORES -.surfaced to.-> OWNER
+    ERRORS -.guarded by.-> RAG_UI
