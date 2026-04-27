@@ -45,7 +45,7 @@ Three public functions plus two small dataclasses.
   - `texts`: string array, shape `[n_docs]` (raw markdown content)
 
 - `load_index(index_path: Path) -> Index`
-  Loads the `.npz` and returns an `Index` dataclass holding `embeddings`, `filenames`, `texts`, and a reference to the cached model.
+  Loads the `.npz` and returns an `Index` dataclass holding `embeddings`, `filenames`, and `texts`. The embedding model is held in a module-level cache (`_get_model()`), not on the `Index` itself.
 
 - `query(index: Index, question: str, top_k: int = 3, threshold: float = 0.35) -> QueryResult`
   Embeds the question, normalizes it, computes cosine similarity against `index.embeddings` via dot product, sorts descending, and returns:

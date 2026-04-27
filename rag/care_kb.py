@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List
@@ -91,7 +92,9 @@ def query(
 	if q_norm > 0:
 		q_vec = q_vec / q_norm
 
-	scores = index.embeddings @ q_vec
+	with warnings.catch_warnings():
+		warnings.simplefilter("ignore", RuntimeWarning)
+		scores = index.embeddings @ q_vec
 	k = min(top_k, scores.shape[0])
 	top_idx = np.argsort(-scores)[:k]
 
