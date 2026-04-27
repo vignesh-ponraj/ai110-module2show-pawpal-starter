@@ -369,13 +369,20 @@ if st.button("Ask"):
                 st.warning(result.answer)
 
             with st.expander("Retrieved snippets"):
-                st.table(
+                st.dataframe(
                     [
                         {
                             "filename": match.filename,
                             "score": round(match.score, 3),
-                            "preview": match.text.strip().replace("\n", " ")[:80],
+                            "preview": match.text.strip().lstrip("#").strip().replace("\n", " ")[:120],
                         }
                         for match in result.matches
-                    ]
+                    ],
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "filename": st.column_config.TextColumn("filename", width="medium"),
+                        "score": st.column_config.NumberColumn("score", width="small", format="%.3f"),
+                        "preview": st.column_config.TextColumn("preview", width="large"),
+                    },
                 )
