@@ -326,3 +326,56 @@ if st.session_state.current_plan is not None:
                 for task_id in plan.unscheduled_task_ids
             ]
         )
+
+st.divider()
+
+st.subheader("Ask PawPal")
+st.caption("Free-text Q&A grounded in a small local pet-care knowledge base.")
+
+
+@st.cache_resource(show_spinner="Loading knowledge base...")
+def get_index():
+    from pathlib import Path
+
+    from rag.care_kb import build_index, load_index
+
+    corpus_dir = Path("data/care_tips")
+    index_path = Path("rag/index.npz")
+    if not index_path.exists():
+        build_index(corpus_dir, index_path)
+    return load_index(index_path)
+
+
+question = st.text_input(
+    "Ask a pet-care question",
+    placeholder="How long should I walk a 3-year-old labrador?",
+)
+
+if st.button("Ask"):
+    if not question.strip():
+        st.info("Type a question first.")
+    else:
+        from rag.care_kb import query
+
+        try:
+            index = get_index()
+        except ValueError as exc:
+            st.error(f"Knowledge base error: {exc}")
+        else:
+            result = query(index, question.strip())
+            if result.confident:
+                st.markdown(result.answer)
+            else:
+                st.warning(result.answer)
+
+            with st.expander("Retrieved snippets"):
+                st.table(
+                    [
+                        {
+                            "filename": match.filename,
+                            "score": round(match.score, 3),
+                            "preview": match.text.strip().replace("\n", " ")[:80],
+                        }
+                        for match in result.matches
+                    ]
+                )
