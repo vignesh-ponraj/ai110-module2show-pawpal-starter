@@ -2,6 +2,12 @@
 
 A Streamlit-based pet-care assistant. Helps a pet owner plan a daily care schedule for their pet(s) based on time, priority, and preferences — and now also answers free-text pet-care questions from a small local knowledge base.
 
+## Demo walkthrough
+
+▶ **[Loom video — end-to-end walkthrough](https://www.loom.com/share/908d72c34815489c936d95a7c44a83ef)**
+
+The video shows the system running with three sample inputs: a confident cited answer, a topic-different cited answer, and an explicit refusal of an off-topic question — plus the automated test suite as a reliability check.
+
 ## Original project (Modules 1–3)
 
 The original project, **PawPal+**, was a Streamlit pet-care planning app built across Modules 1–3 of AI 110. Its goal was to help a busy pet owner stay consistent with care by tracking tasks (walks, feeding, meds, grooming), considering constraints (time available, priority, required-today flags), and producing a daily plan with conflict detection, sorting/filtering, and recurring-task support. It exposed a Streamlit UI backed by a typed Python data model (`Owner`, `Pet`, `CareTask`, `DailyPlan`, `Scheduler`) and a pytest suite covering the highest-risk scheduling behaviors.
@@ -20,6 +26,10 @@ This matters because pet care is consistency-driven: an owner needs both a *plan
 ## Architecture overview
 
 The system has two cooperating subsystems that share a single Streamlit UI and a common data directory:
+
+![PawPal+ system architecture](assets/system-diagram.png)
+
+The mermaid source for the diagram lives at [`assets/system-diagram.mmd`](assets/system-diagram.mmd). It also renders inline below for GitHub viewers:
 
 ```mermaid
 flowchart TD
@@ -73,8 +83,6 @@ flowchart TD
     SCORES -.surfaced to.-> OWNER
     ERRORS -.guarded by.-> RAG_UI
 ```
-
-The diagram source lives at [docs/system-diagram.mmd](docs/system-diagram.mmd).
 
 **How data flows.** The owner enters owner/pet info and tasks (input), the **Scheduler** orders and packs them into a daily plan within the available-minutes budget (process), and the plan is rendered as a table (output). Independently, the owner types a question into "Ask PawPal" (input), the **RAG retriever** embeds it, computes cosine similarity against pre-built embeddings of the corpus, and returns the top-3 matches (process); the **confidence gate** decides whether to return a cited snippet or say "I can't answer" (output).
 
@@ -180,7 +188,7 @@ A few choices and the trade-offs behind them:
 1. **Automated tests.** 29 tests run against the real embedding model in ~5s. No mocking of the retrieval path. ✅ all passing.
 2. **Confidence scoring.** Every RAG query returns a `confident: bool` flag plus per-match cosine scores. The UI shows the top-3 with scores so a human can verify retrieval quality on every interaction. The system explicitly refuses to answer below threshold.
 3. **Error handling.** Empty corpus → `ValueError("knowledge base is empty")` surfaced as `st.error`. Missing index file → `FileNotFoundError`. Missing index on app launch → auto-rebuild with a spinner. Empty question submitted → friendly `st.info("Type a question first.")` (no model call).
-4. **Spec-to-test traceability.** Each requirement in [docs/superpowers/specs/2026-04-26-pet-care-rag-design.md](docs/superpowers/specs/2026-04-26-pet-care-rag-design.md) maps to at least one test in `tests/test_care_kb.py`.
+4. **Spec-to-test traceability.** Each behavior described in this README's *Architecture overview* maps to at least one test in `tests/test_care_kb.py`.
 
 **One-line testing summary:** *29 of 29 tests pass; the system correctly answers semantically-aligned pet-care questions (cosine scores 0.6–0.85) and correctly refuses off-topic questions (cosine scores ≤ 0.1, well below the 0.35 threshold).*
 
@@ -189,31 +197,28 @@ A few choices and the trade-offs behind them:
 - Initially the off-topic test used `"what is the capital of France?"` against the small corpus, which scored above the default 0.5 threshold (the embedding model finds *some* surface signal in any question). We switched to `"explain quantum mechanics in detail"` and `threshold=0.6` for the test, which exposed a real lesson: thresholds for sentence-level embedding similarity are noisy at the boundary, and using a fixed threshold without surfacing the score to the user would mask false confidence. The visible top-3 table in the UI is the mitigation.
 - Apple Accelerate BLAS + NumPy 2.x emits spurious `RuntimeWarning`s on the float32 cosine matmul even though the output is valid. Suppressed with a one-line `warnings.catch_warnings()` because the noise would otherwise be visible during a live demo.
 
-## Reflection
+## Reflection / model card
 
-See [reflection.md](reflection.md) for a short reflection on limitations, possible misuse, what surprised us during testing, and AI-collaboration moments (one helpful, one flawed) during this project.
+See [model_card.md](model_card.md) for the project's model card and reflection — limitations and biases, possible misuse and mitigations, what surprised us during testing, and AI-collaboration moments (one helpful, one flawed) during this project.
 
 ## Project layout
 
 ```
 .
-├── app.py                                          Streamlit UI (scheduling + Ask PawPal)
-├── pawpal_system.py                                Original scheduling subsystem
+├── app.py                                Streamlit UI (scheduling + Ask PawPal)
+├── pawpal_system.py                      Original scheduling subsystem (Modules 1–3)
 ├── rag/
-│   ├── __init__.py                                 Re-exports the public API
-│   └── care_kb.py                                  RAG: build_index, load_index, query, CLI
+│   ├── __init__.py                       Re-exports the public API
+│   └── care_kb.py                        RAG: build_index, load_index, query, CLI
 ├── data/
-│   └── care_tips/*.md                              20 hand-written knowledge snippets
+│   └── care_tips/*.md                    20 hand-written knowledge snippets
 ├── tests/
-│   ├── test_pawpal.py                              7 scheduling tests
-│   └── test_care_kb.py                             22 RAG tests
-├── docs/
-│   ├── system-diagram.mmd                          Project-level architecture diagram
-│   └── superpowers/
-│       ├── specs/2026-04-26-pet-care-rag-design.md RAG design spec
-│       ├── specs/rag-system-diagram.mmd            RAG-only diagram
-│       └── plans/2026-04-26-pet-care-rag.md        10-task implementation plan
-├── reflection.md                                   Short project reflection
+│   ├── test_pawpal.py                    7 scheduling tests
+│   └── test_care_kb.py                   22 RAG tests
+├── assets/
+│   ├── system-diagram.mmd                Project-level architecture diagram (source)
+│   └── system-diagram.png                Rendered diagram (embedded in README)
+├── model_card.md                         Reflection + model card (limitations, biases, AI collaboration)
 ├── requirements.txt
-└── README.md                                       (this file)
+└── README.md                             (this file)
 ```

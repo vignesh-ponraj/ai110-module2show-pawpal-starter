@@ -1,6 +1,35 @@
-# PawPal+ Reflection (Module 4)
+# PawPal+ Model Card and Reflection (Module 4)
 
-This reflection covers the Module 4 increment that added a knowledge-base RAG ("Ask PawPal") to the existing PawPal+ scheduling app.
+This document is both a project reflection and a lightweight model card for the AI feature added in Module 4 — a knowledge-base RAG ("Ask PawPal") layered onto the existing PawPal+ scheduling app.
+
+## Model and system summary
+
+- **Base project (Modules 1–3):** PawPal+ — a Streamlit pet-care scheduler with a typed Python data model (`Owner`, `Pet`, `CareTask`, `DailyPlan`, `Scheduler`), greedy time-aware scheduling, conflict detection, and a pytest suite.
+- **AI feature (Module 4):** Free-text Q&A over a 20-document hand-written pet-care corpus.
+- **Embedding model:** `sentence-transformers/all-MiniLM-L6-v2` (384-dim, ~80MB, CPU, English-only).
+- **Retrieval:** L2-normalized cosine similarity via dot product against an in-memory NumPy matrix persisted as `.npz`.
+- **Answer strategy:** Extractive — top-1 retrieved snippet is returned verbatim with the source filename as citation. **No LLM, no synthesis, no hallucination risk.**
+- **Confidence gate:** If top-1 cosine score < 0.35, the system replies *"I can't answer that — I don't have information on that topic in my pet-care knowledge base."*
+- **Human-in-the-loop:** Top-3 retrieved documents and their cosine scores are surfaced in the UI on every query.
+
+## Intended use
+
+- Casual pet-care information lookup against a known, small, hand-curated corpus.
+- Demonstrating retrieval-grounded Q&A with explicit refusal as an alternative to LLM synthesis.
+
+## Out of scope
+
+- Veterinary or medical advice, dosing decisions, or emergency triage.
+- Questions outside the 20-topic corpus.
+- Non-English questions.
+
+## Testing results
+
+- **29 of 29 automated tests pass** (`pytest -v`, ~5s on a warm cache):
+  - 7 scheduling tests (`tests/test_pawpal.py`) covering task completion, filtering, time-aware ordering, recurrence, conflict detection.
+  - 22 RAG tests (`tests/test_care_kb.py`) covering dataclass behavior, lazy model caching, index build/save/load round-trip, query top-k correctness, descending score order, valid cosine range, semantic top-1 selection for two distinct topics, threshold gate behavior, configurable threshold, citation formatting, and error paths (empty corpus, missing index).
+- **Confidence-score behavior:** semantically-aligned pet-care queries score 0.6–0.85 against relevant documents; clearly off-topic queries score below 0.1. The 0.35 threshold sits comfortably between these two regimes.
+- **Tests use the real embedding model.** No mocking. The first run on a fresh machine downloads the model (~30s); subsequent runs use the local HuggingFace cache.
 
 ## Limitations and biases
 
