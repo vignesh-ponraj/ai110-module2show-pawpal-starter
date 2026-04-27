@@ -332,6 +332,33 @@ st.divider()
 st.subheader("Ask PawPal")
 st.caption("Free-text Q&A grounded in a small local pet-care knowledge base.")
 
+st.markdown(
+    """
+    <style>
+    [data-testid="stSpinner"] {
+        position: fixed;
+        inset: 0;
+        background: rgba(255, 255, 255, 0.55);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+    }
+    [data-testid="stSpinner"] > div {
+        background: white;
+        padding: 22px 30px;
+        border-radius: 12px;
+        box-shadow: 0 12px 48px rgba(0, 0, 0, 0.18);
+        font-size: 1.05rem;
+        font-weight: 500;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 
 @st.cache_resource(show_spinner="Loading knowledge base...")
 def get_index():
@@ -358,11 +385,12 @@ if st.button("Ask"):
         from rag.care_kb import query
 
         try:
-            index = get_index()
+            with st.spinner("Thinking..."):
+                index = get_index()
+                result = query(index, question.strip())
         except ValueError as exc:
             st.error(f"Knowledge base error: {exc}")
         else:
-            result = query(index, question.strip())
             if result.confident:
                 st.markdown(result.answer)
             else:
